@@ -1,0 +1,75 @@
+name: ETLE Bot 
+
+on:
+  # 1. TRIGGER DARI APPSHEET (Saat user input & save)
+  repository_dispatch:
+    types: [cek_etle_trigger]
+
+  # 2. TRIGGER JADWAL (CRON JOB)
+  # Jam 9 Pagi WIB = Jam 02:00 UTC (Karena UTC+7)
+  schedule:
+    # Format: [Menit] [Jam_UTC] [Tgl] [Bulan] [Hari]
+    # '0 2 * * 1' artinya: Menit 0, Jam 2 UTC, Setiap Senin (1)
+    - cron: '0 2 * * 1'
+
+  # 3. TRIGGER MANUAL (Tombol Test di GitHub)
+  workflow_dispatch:
+    inputs:
+      plat:
+        description: 'Plat Nomor'
+        required: true
+        default: 'B 1234 TES'
+      rangka:
+        description: 'No Rangka'
+        required: true
+        default: '12345'
+      mesin:
+        description: 'No Mesin'
+        required: true
+        default: '67890'
+      row_id:
+        description: 'Row ID AppSheet'
+        required: true
+        default: 'TEST_ID'
+
+jobs:
+  jalankan_robot:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ambil Kode (Checkout)
+        uses: actions/checkout@v3
+
+      - name: Siapkan Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Library
+        run: |
+          pip install pandas requests selenium webdriver-manager
+
+      - name: Jalankan Script Scraper
+        env:
+          APPSHEET_ID: ${{ secrets.APPSHEET_ID }}
+          APPSHEET_KEY: ${{ secrets.APPSHEET_KEY }}
+        run: |
+          # LOGIKA DETEKSI TRIGGER
+          
+          # A. Jika dari AppSheet (Repository Dispatch)
+          if [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+            echo "Mode: Trigger AppSheet"
+            python main.py "${{ github.event.client_payload.plat }}" "${{ github.event.client_payload.rangka }}" "${{ github.event.client_payload.mesin }}" "${{ github.event.client_payload.row_id }}"
+          
+          # B. Jika Manual Test (Workflow Dispatch)
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Mode: Manual Test GitHub"
+            python main.py "${{ github.event.inputs.plat }}" "${{ github.event.inputs.rangka }}" "${{ github.event.inputs.mesin }}" "${{ github.event.inputs.row_id }}"
+
+          # C. Jika Jadwal Rutin (Schedule)
+          else
+            echo "Mode: Jadwal Rutin (Mingguan)"
+            echo "⚠️ PERHATIAN: Script main.py saat ini butuh input manual (Plat/Rangka)."
+            echo "Untuk mode jadwal massal, script main.py perlu dimodifikasi agar membaca SEMUA data dari AppSheet dulu."
+            # Nanti kita update bagian ini kalau mau cek massal otomatis
+          fi
